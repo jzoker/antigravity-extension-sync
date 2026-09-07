@@ -36,12 +36,12 @@ interface GistResponse {
 }
 
 /** Obtains an active GitHub authentication session with gist permissions from the editor. */
-export async function getGithubSession(createIfNone: boolean = true): Promise<vscode.AuthenticationSession> {
+export async function getGithubSession(createIfNone: boolean = true): Promise<vscode.AuthenticationSession | null> {
   const session = await vscode.authentication.getSession(AUTH_PROVIDER_ID, AUTH_SCOPES, { createIfNone });
-  if (!session) {
+  if (!session && createIfNone) {
     throw new Error('GitHub authentication failed or was cancelled by user.');
   }
-  return session;
+  return session || null;
 }
 
 /** Finds an existing Antigravity sync Gist on the user account without creating an empty one. */
@@ -84,6 +84,9 @@ export async function uploadConfig(
   paths: AntigravityPaths,
 ): Promise<{ filesUploaded: number; gistId: string }> {
   const session = await getGithubSession(true);
+  if (!session) {
+    throw new Error('GitHub authentication failed or was cancelled by user.');
+  }
   let gistId = await findExistingGistId(context, session.accessToken);
 
   const localConfigBundle = scanAllowedSyncFiles(paths.configDir);
@@ -158,8 +161,12 @@ export async function uploadConfig(
 export async function downloadConfig(
   context: vscode.ExtensionContext,
   paths: AntigravityPaths,
+  interactive: boolean = true,
 ): Promise<{ filesDownloaded: number; gistId: string }> {
-  const session = await getGithubSession(false);
+  const session = await getGithubSession(interactive);
+  if (!session) {
+    return { filesDownloaded: 0, gistId: '' };
+  }
   const gistId = await findExistingGistId(context, session.accessToken);
 
   if (!gistId) {

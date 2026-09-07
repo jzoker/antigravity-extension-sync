@@ -35,7 +35,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const downloadDisposable = vscode.commands.registerCommand('antigravitySync.download', async () => {
     try {
       statusBar.setSyncing('Downloading...');
-      const result = await downloadConfig(context, paths);
+      const result = await downloadConfig(context, paths, true);
       statusBar.setIdle('Synced');
       if (result.filesDownloaded === 0) {
         vscode.window.showInformationMessage(
@@ -76,9 +76,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       let gistId = context.globalState.get<string>(GLOBAL_STATE_GIST_KEY);
       if (!gistId) {
         const session = await getGithubSession(true);
-        const foundId = await findExistingGistId(context, session.accessToken);
-        if (foundId) {
-          gistId = foundId;
+        if (session) {
+          const foundId = await findExistingGistId(context, session.accessToken);
+          if (foundId) {
+            gistId = foundId;
+          }
         }
       }
 
@@ -150,7 +152,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     setTimeout(async () => {
       try {
         statusBar.setSyncing('Syncing on launch...');
-        const result = await downloadConfig(context, paths);
+        const result = await downloadConfig(context, paths, false);
         statusBar.setIdle('Synced');
         if (result.filesDownloaded > 0) {
           console.log(`[AntigravitySync] Startup sync completed: ${result.filesDownloaded} items.`);
