@@ -36,9 +36,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       statusBar.setSyncing('Downloading...');
       const result = await downloadConfig(context, paths);
       statusBar.setIdle('Synced');
-      vscode.window.showInformationMessage(
-        `[Antigravity Sync] Successfully downloaded ${result.filesDownloaded} items from cloud.`,
-      );
+      if (result.filesDownloaded === 0) {
+        vscode.window.showInformationMessage(
+          '[Antigravity Sync] No remote configuration found on cloud. Please use Upload first.',
+        );
+      } else {
+        vscode.window.showInformationMessage(
+          `[Antigravity Sync] Successfully downloaded ${result.filesDownloaded} items from cloud.`,
+        );
+      }
     } catch (err: unknown) {
       statusBar.setError('Download Failed');
       const message = err instanceof Error ? err.message : String(err);
@@ -49,7 +55,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Command: Open Global Rules
   const openRulesDisposable = vscode.commands.registerCommand('antigravitySync.openRules', async () => {
     if (!fs.existsSync(paths.rulesFile)) {
-      // Create template file if missing
       fs.writeFileSync(paths.rulesFile, '# Coding\n1. Keep code minimal\n', 'utf8');
     }
     const doc = await vscode.workspace.openTextDocument(paths.rulesFile);
@@ -119,7 +124,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         statusBar.setSyncing('Syncing on launch...');
         const result = await downloadConfig(context, paths);
         statusBar.setIdle('Synced');
-        console.log(`[AntigravitySync] Startup sync completed: ${result.filesDownloaded} items.`);
+        if (result.filesDownloaded > 0) {
+          console.log(`[AntigravitySync] Startup sync completed: ${result.filesDownloaded} items.`);
+        }
       } catch (err: unknown) {
         statusBar.setIdle('Ready');
         console.warn('[AntigravitySync] Startup download skipped or deferred:', err);
@@ -137,4 +144,3 @@ export function deactivate(): void {
     saveDebounceTimer = null;
   }
 }
-

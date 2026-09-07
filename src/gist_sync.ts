@@ -41,8 +41,8 @@ export async function getGithubSession(createIfNone: boolean = true): Promise<vs
   return session;
 }
 
-/** Finds an existing Antigravity sync Gist or creates a new private secret Gist. */
-export async function getOrCreateGistId(context: vscode.ExtensionContext, token: string): Promise<string> {
+/** Finds an existing Antigravity sync Gist on the user's account without creating an empty one. */
+export async function findExistingGistId(context: vscode.ExtensionContext, token: string): Promise<string | null> {
   // 1. Check user settings override
   const configGistId = vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION).get<string>('gistId');
   if (configGistId && configGistId.trim() !== '') {
@@ -72,34 +72,7 @@ export async function getOrCreateGistId(context: vscode.ExtensionContext, token:
     }
   }
 
-  // 4. Create new secret Gist
-  const createPayload = {
-    description: GIST_DESCRIPTION,
-    public: false,
-    files: {
-      [GIST_ROOT_RULES]: {
-        content: '# Coding\n1. Keep code minimal\n',
-      },
-      [GIST_CONFIG_BUNDLE]: {
-        content: JSON.stringify({}, null, 2),
-      },
-    },
-  };
-
-  const createRes = await fetch(GITHUB_API_URL, {
-    method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify(createPayload),
-  });
-
-  if (!createRes.ok) {
-    const errText = await createRes.text();
-    throw new Error(`Failed to create secret Gist on cloud: ${createRes.status} ${errText}`);
-  }
-
-  const createdGist = (await createRes.json()) as GistResponse;
-  await context.globalState.update(GLOBAL_STATE_GIST_KEY, createdGist.id);
-  return createdGist.id;
+  return null;
 }
 
 /** Uploads local configuration files and global rules to the secret Gist. */
@@ -108,7 +81,7 @@ export async function uploadConfig(
   paths: AntigravityPaths,
 ): Promise<{ filesUploaded: number; gistId: string }> {
   const session = await getGithubSession(true);
-  const gistId = await getOrCreateGistId(context, session.accessToken);
+  let gistId = await findExistingGistId(context, session.accessToken);
 
   const localRules = readGlobalRules(paths.rulesFile);
   const localConfigBundle = scanDirectoryRecursive(paths.configDir);
@@ -116,7 +89,7 @@ export async function uploadConfig(
 
   const payloadFiles: { [filename: string]: { content: string } } = {
     [GIST_ROOT_RULES]: {
-      content: localRules !== null ? localRules : '# Rules\n',
+      content: localRules !== null && localRules.trim() !== '' ? localRules : '# Rules\n',
     },
     [GIST_CONFIG_BUNDLE]: {
       content: JSON.stringify(localConfigBundle, null, 2),
@@ -130,18 +103,41 @@ export async function uploadConfig(
     'User-Agent': 'Antigravity-Extension-Sync',
   };
 
-  const res = await fetch(`${GITHUB_API_URL}/${gistId}`, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify({
-      description: GIST_DESCRIPTION,
-      files: payloadFiles,
-    }),
-  });
+  if (gistId) {
+    // Update existing Gist
+    const res = await fetch(`${GITHUB_API_URL}/${gistId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        description: GIST_DESCRIPTION,
+        files: payloadFiles,
+      }),
+    });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Cloud upload failed (e.g., status ${res.status}): ${errText}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Cloud update failed (status ${res.status}): ${errText}`);
+    }
+  } else {
+    // Create new Gist using REAL local content
+    const res = await fetch(GITHUB_API_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        description: GIST_DESCRIPTION,
+        public: false,
+        files: payloadFiles,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Cloud creation failed (status ${res.status}): ${errText}`);
+    }
+
+    const created = (await res.json()) as GistResponse;
+    gistId = created.id;
+    await context.globalState.update(GLOBAL_STATE_GIST_KEY, gistId);
   }
 
   return {
@@ -150,13 +146,18 @@ export async function uploadConfig(
   };
 }
 
-/** Downloads remote configuration and global rules from the secret Gist to the local machine. */
+/** Downloads remote configuration and global rules from the secret Gist to the local machine safely. */
 export async function downloadConfig(
   context: vscode.ExtensionContext,
   paths: AntigravityPaths,
 ): Promise<{ filesDownloaded: number; gistId: string }> {
-  const session = await getGithubSession(true);
-  const gistId = await getOrCreateGistId(context, session.accessToken);
+  const session = await getGithubSession(false);
+  const gistId = await findExistingGistId(context, session.accessToken);
+
+  if (!gistId) {
+    // No remote Gist exists; do NOT overwrite local files!
+    return { filesDownloaded: 0, gistId: '' };
+  }
 
   const headers = {
     Authorization: `Bearer ${session.accessToken}`,
@@ -167,26 +168,29 @@ export async function downloadConfig(
   const res = await fetch(`${GITHUB_API_URL}/${gistId}`, { headers });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Cloud download failed (e.g., status ${res.status}): ${errText}`);
+    throw new Error(`Cloud download failed (status ${res.status}): ${errText}`);
   }
 
   const gist = (await res.json()) as GistResponse;
   let restoredCount = 0;
 
-  // Restore GEMINI.md global rules
-  if (gist.files && gist.files[GIST_ROOT_RULES]) {
+  // Restore GEMINI.md global rules safely (only if remote content is non-empty)
+  if (gist.files && gist.files[GIST_ROOT_RULES] && gist.files[GIST_ROOT_RULES].content.trim() !== '') {
     writeSafeFile(paths.rulesFile, gist.files[GIST_ROOT_RULES].content);
     restoredCount += 1;
   }
 
   // Restore bundled configs under ~/.gemini/config
-  if (gist.files && gist.files[GIST_CONFIG_BUNDLE]) {
+  if (gist.files && gist.files[GIST_CONFIG_BUNDLE] && gist.files[GIST_CONFIG_BUNDLE].content) {
     try {
       const bundle = JSON.parse(gist.files[GIST_CONFIG_BUNDLE].content) as ConfigFileMap;
-      for (const [relativePath, content] of Object.entries(bundle)) {
-        const destPath = path.join(paths.configDir, relativePath);
-        writeSafeFile(destPath, content);
-        restoredCount += 1;
+      const keys = Object.keys(bundle);
+      if (keys.length > 0) {
+        for (const [relativePath, content] of Object.entries(bundle)) {
+          const destPath = path.join(paths.configDir, relativePath);
+          writeSafeFile(destPath, content);
+          restoredCount += 1;
+        }
       }
     } catch (err) {
       console.error('[AntigravitySync] Error parsing remote config bundle:', err);
@@ -198,4 +202,3 @@ export async function downloadConfig(
     gistId,
   };
 }
-
