@@ -20,8 +20,8 @@ Cross-platform configuration and rule synchronizer across multiple operating env
 
 ### Settings
 
-- `autoSyncOnStartup`: Automatically download latest settings upon editor launch (default: `true`).
-- `autoSyncOnSave`: Automatically upload settings upon modifying and saving configuration files (default: `true`).
+- `autoSyncOnStartup`: Automatically download latest settings upon editor launch (default: `false`).
+- `autoSyncOnSave`: Automatically upload settings upon modifying and saving configuration files (default: `false`).
 - `customPath`: Optional custom directory path override.
 - `gistId`: Remote storage identifier for the configuration bundle.
 

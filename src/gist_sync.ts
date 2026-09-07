@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
@@ -87,6 +88,10 @@ export async function uploadConfig(
 
   const localConfigBundle = scanAllowedSyncFiles(paths.configDir);
   const configCount = Object.keys(localConfigBundle).length;
+
+  if (configCount === 0) {
+    throw new Error('Local rules and skills are empty. Upload aborted to protect cloud backup.');
+  }
 
   // Single file bundle containing all configs, rules, and skills
   const payloadFiles: { [filename: string]: { content: string } | null } = {
@@ -199,6 +204,17 @@ export async function downloadConfig(
             continue;
           }
           const destPath = path.join(paths.configDir, relativePath);
+          // Preserve backup (.bak) if local file already exists with different content
+          if (fs.existsSync(destPath)) {
+            try {
+              const currentContent = fs.readFileSync(destPath, 'utf8');
+              if (currentContent !== content) {
+                fs.writeFileSync(`${destPath}.bak`, currentContent, 'utf8');
+              }
+            } catch {
+              // Ignore backup read/write errors gracefully
+            }
+          }
           writeSafeFile(destPath, content);
           restoredCount += 1;
         }

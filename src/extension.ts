@@ -78,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Watcher: Auto-sync on file save
   const saveWatcherDisposable = vscode.workspace.onDidSaveTextDocument(async (document) => {
     const config = vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION);
-    const autoSyncOnSave = config.get<boolean>('autoSyncOnSave', true);
+    const autoSyncOnSave = config.get<boolean>('autoSyncOnSave', false);
     if (!autoSyncOnSave) {
       return;
     }
@@ -118,7 +118,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   // Auto-sync on startup if enabled
-  const autoSyncOnStartup = vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION).get<boolean>('autoSyncOnStartup', true);
+  const autoSyncOnStartup = vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION).get<boolean>('autoSyncOnStartup', false);
   if (autoSyncOnStartup) {
     // Delay slightly after editor startup (e.g., 2000ms) to ensure auth provider is ready
     setTimeout(async () => {

@@ -2,7 +2,7 @@
   "name": "antigravity-extension-sync",
   "displayName": "Antigravity Extension Sync",
   "description": "Cross-platform synchronization for agent configuration files and rules.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "jzoker",
   "license": "MIT",
   "repository": {
@@ -50,13 +50,13 @@
         },
         "antigravitySync.autoSyncOnStartup": {
           "type": "boolean",
-          "default": true,
-          "description": "Automatically download latest config from cloud when editor launches."
+          "default": false,
+          "description": "Automatically download latest config from cloud when editor launches (default: false)."
         },
         "antigravitySync.autoSyncOnSave": {
           "type": "boolean",
-          "default": true,
-          "description": "Automatically upload to cloud when config files or GEMINI.md are saved."
+          "default": false,
+          "description": "Automatically upload to cloud when config files or GEMINI.md are saved (default: false)."
         },
         "antigravitySync.customPath": {
           "type": "string",
