@@ -2,8 +2,8 @@
   "name": "antigravity-extension-sync",
   "displayName": "Antigravity Extension Sync",
   "description": "Cross-platform synchronization for agent configuration files and rules.",
-  "version": "0.1.8",
-  "publisher": "jzoker",
+  "version": "0.1.9",
+  "publisher": "TranQuangTuan",
   "license": "MIT",
   "repository": {
     "type": "git",
