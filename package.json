@@ -2,7 +2,7 @@
   "name": "antigravity-extension-sync",
   "displayName": "Antigravity Extension Sync",
   "description": "Cross-platform synchronization for agent configuration files and rules.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "jzoker",
   "license": "MIT",
   "repository": {
@@ -38,6 +38,11 @@
       {
         "command": "antigravitySync.openConfig",
         "title": "Antigravity Sync: Open Config Folder"
+      },
+      {
+        "command": "antigravitySync.openGist",
+        "title": "Antigravity Sync: Open Cloud Gist in Browser",
+        "icon": "$(globe)"
       }
     ],
     "configuration": {

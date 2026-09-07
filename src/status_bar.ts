@@ -62,6 +62,11 @@ export async function showQuickPickMenu(): Promise<void> {
       detail: 'Reveal the ~/.gemini/config folder in system explorer',
       command: 'antigravitySync.openConfig',
     },
+    {
+      label: '$(globe) Open Cloud Gist in Browser',
+      detail: 'View your remote configuration Gist on GitHub in browser',
+      command: 'antigravitySync.openGist',
+    },
   ];
 
   const selected = await vscode.window.showQuickPick(options, {

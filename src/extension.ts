@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { EXTENSION_CONFIG_SECTION, SYNC_DEBOUNCE_MS } from './constants';
-import { downloadConfig, uploadConfig } from './gist_sync';
+import { EXTENSION_CONFIG_SECTION, GLOBAL_STATE_GIST_KEY, SYNC_DEBOUNCE_MS } from './constants';
+import { downloadConfig, findExistingGistId, getGithubSession, uploadConfig } from './gist_sync';
 import { isPathAllowedForSync, resolveAntigravityPaths, writeSafeFile } from './platform';
 import { createSyncStatusBar, showQuickPickMenu } from './status_bar';
 
@@ -70,6 +70,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(paths.configDir));
   });
 
+  // Command: Open Cloud Gist in Browser
+  const openGistDisposable = vscode.commands.registerCommand('antigravitySync.openGist', async () => {
+    try {
+      let gistId = context.globalState.get<string>(GLOBAL_STATE_GIST_KEY);
+      if (!gistId) {
+        const session = await getGithubSession(true);
+        const foundId = await findExistingGistId(context, session.accessToken);
+        if (foundId) {
+          gistId = foundId;
+        }
+      }
+
+      if (gistId) {
+        vscode.env.openExternal(vscode.Uri.parse(`https://gist.github.com/${gistId}`));
+      } else {
+        vscode.window.showInformationMessage(
+          '[Antigravity Sync] No cloud Gist found yet. Please upload your configuration first.',
+        );
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`[Antigravity Sync] Failed to open Gist: ${message}`);
+    }
+  });
+
   // Command: QuickPick Menu
   const menuDisposable = vscode.commands.registerCommand('antigravitySync.showMenu', async () => {
     await showQuickPickMenu();
@@ -113,6 +138,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     downloadDisposable,
     openRulesDisposable,
     openConfigDisposable,
+    openGistDisposable,
     menuDisposable,
     saveWatcherDisposable,
   );
