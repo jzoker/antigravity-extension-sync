@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
@@ -93,12 +94,10 @@ export async function uploadConfig(
   }
 
   // Single file bundle containing all configs, rules, and skills
-  const payloadFiles: { [filename: string]: { content: string } | null } = {
+  const payloadFiles: { [filename: string]: { content: string } } = {
     [GIST_CONFIG_BUNDLE]: {
       content: JSON.stringify(localConfigBundle, null, 2),
     },
-    // Explicitly delete legacy standalone GEMINI.md from Gist if present
-    'GEMINI.md': null,
   };
 
   const headers = {
@@ -203,6 +202,17 @@ export async function downloadConfig(
             continue;
           }
           const destPath = path.join(paths.configDir, relativePath);
+          // Preserve backup (.bak) if local file already exists with different content
+          if (fs.existsSync(destPath)) {
+            try {
+              const currentContent = fs.readFileSync(destPath, 'utf8');
+              if (currentContent !== content) {
+                fs.writeFileSync(`${destPath}.bak`, currentContent, 'utf8');
+              }
+            } catch {
+              // Ignore backup read/write errors gracefully
+            }
+          }
           writeSafeFile(destPath, content);
           restoredCount += 1;
         }
