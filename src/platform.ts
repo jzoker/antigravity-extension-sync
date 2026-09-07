@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { EXTENSION_CONFIG_SECTION } from './constants';
+import { ALLOWED_SYNC_SUBDIRS, EXTENSION_CONFIG_SECTION } from './constants';
 
 export interface AntigravityPaths {
   platform: NodeJS.Platform;
@@ -81,6 +81,39 @@ export function scanDirectoryRecursive(dirPath: string, rootDir: string = dirPat
   return result;
 }
 
+/** Scans strictly allowed directories (rules and skills), explicitly omitting machine-specific files. */
+export function scanAllowedSyncFiles(configDir: string): ConfigFileMap {
+  const result: ConfigFileMap = {};
+  for (const subDir of ALLOWED_SYNC_SUBDIRS) {
+    const targetDir = path.join(configDir, subDir);
+    if (fs.existsSync(targetDir)) {
+      Object.assign(result, scanDirectoryRecursive(targetDir, configDir));
+    }
+  }
+
+  // Also include root GEMINI.md if placed directly under config
+  const rootRules = path.join(configDir, 'GEMINI.md');
+  if (fs.existsSync(rootRules)) {
+    try {
+      const content = fs.readFileSync(rootRules, 'utf8');
+      result['GEMINI.md'] = normalizeLineEndings(content);
+    } catch (err) {
+      console.warn('[AntigravitySync] Failed to read root GEMINI.md:', err);
+    }
+  }
+
+  return result;
+}
+
+/** Validates whether a relative path is allowed to be synchronized (whitelisted to rules and skills). */
+export function isPathAllowedForSync(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  if (normalized === 'GEMINI.md' || normalized === 'rules/GEMINI.md') {
+    return true;
+  }
+  return ALLOWED_SYNC_SUBDIRS.some((subDir) => normalized.startsWith(`${subDir}/`));
+}
+
 /** Reads global rules file (GEMINI.md) if present on the local machine. */
 export function readGlobalRules(rulesFilePath: string): string | null {
   if (fs.existsSync(rulesFilePath)) {
@@ -97,4 +130,3 @@ export function writeSafeFile(targetPath: string, content: string): void {
   }
   fs.writeFileSync(targetPath, content, 'utf8');
 }
-

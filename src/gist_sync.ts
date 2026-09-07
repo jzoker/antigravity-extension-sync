@@ -9,7 +9,8 @@ import {
 import {
   AntigravityPaths,
   ConfigFileMap,
-  scanDirectoryRecursive,
+  isPathAllowedForSync,
+  scanAllowedSyncFiles,
   writeSafeFile,
 } from './platform';
 
@@ -84,7 +85,7 @@ export async function uploadConfig(
   const session = await getGithubSession(true);
   let gistId = await findExistingGistId(context, session.accessToken);
 
-  const localConfigBundle = scanDirectoryRecursive(paths.configDir);
+  const localConfigBundle = scanAllowedSyncFiles(paths.configDir);
   const configCount = Object.keys(localConfigBundle).length;
 
   // Single file bundle containing all configs, rules, and skills
@@ -193,6 +194,10 @@ export async function downloadConfig(
       if (rawContent && rawContent.trim() !== '') {
         const bundle = JSON.parse(rawContent) as ConfigFileMap;
         for (const [relativePath, content] of Object.entries(bundle)) {
+          if (!isPathAllowedForSync(relativePath)) {
+            console.log(`[AntigravitySync] Skipping disallowed path during restore: ${relativePath}`);
+            continue;
+          }
           const destPath = path.join(paths.configDir, relativePath);
           writeSafeFile(destPath, content);
           restoredCount += 1;

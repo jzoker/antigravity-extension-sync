@@ -6,3 +6,4 @@ export const SYNC_DEBOUNCE_MS = 3000; // Debounce window before auto-uploading o
 export const GIST_CONFIG_BUNDLE = 'antigravity_config_bundle.json';
 export const GLOBAL_STATE_GIST_KEY = 'antigravitySync.gistId';
 export const EXTENSION_CONFIG_SECTION = 'antigravitySync';
+export const ALLOWED_SYNC_SUBDIRS = ['rules', 'skills']; // Only synchronize portable rules and skills

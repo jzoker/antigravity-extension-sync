@@ -1,8 +1,9 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { EXTENSION_CONFIG_SECTION, SYNC_DEBOUNCE_MS } from './constants';
 import { downloadConfig, uploadConfig } from './gist_sync';
-import { resolveAntigravityPaths, writeSafeFile } from './platform';
+import { isPathAllowedForSync, resolveAntigravityPaths, writeSafeFile } from './platform';
 import { createSyncStatusBar, showQuickPickMenu } from './status_bar';
 
 let saveDebounceTimer: NodeJS.Timeout | null = null;
@@ -83,8 +84,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     const savedPath = document.uri.fsPath;
-    // Check if the saved file is inside ~/.gemini
-    if (savedPath.startsWith(paths.geminiDir)) {
+    const relPath = path.relative(paths.configDir, savedPath).replace(/\\/g, '/');
+    // Only auto-upload if the saved file is strictly in rules/ or skills/
+    if (!relPath.startsWith('..') && isPathAllowedForSync(relPath)) {
       if (saveDebounceTimer) {
         clearTimeout(saveDebounceTimer);
       }
