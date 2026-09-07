@@ -1,0 +1,80 @@
+{
+  "name": "antigravity-extension-sync",
+  "displayName": "Antigravity Extension Sync",
+  "description": "Cross-platform synchronization for agent configuration files and rules.",
+  "version": "0.1.0",
+  "publisher": "jzoker",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jzoker/antigravity-extension-sync.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "antigravitySync.upload",
+        "title": "Antigravity Sync: Upload Config to Cloud",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "antigravitySync.download",
+        "title": "Antigravity Sync: Download Config from Cloud",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "antigravitySync.openRules",
+        "title": "Antigravity Sync: Open Global Rules (GEMINI.md)"
+      },
+      {
+        "command": "antigravitySync.openConfig",
+        "title": "Antigravity Sync: Open Config Folder"
+      }
+    ],
+    "configuration": {
+      "title": "Antigravity Extension Sync",
+      "properties": {
+        "antigravitySync.gistId": {
+          "type": "string",
+          "default": "",
+          "description": "Secret Gist ID used for storing configuration. Leave blank to auto-create."
+        },
+        "antigravitySync.autoSyncOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically download latest config from cloud when editor launches."
+        },
+        "antigravitySync.autoSyncOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically upload to cloud when config files or GEMINI.md are saved."
+        },
+        "antigravitySync.customPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to .gemini directory. If empty, automatically detected by OS."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}
+
