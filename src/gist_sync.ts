@@ -4,13 +4,11 @@ import {
   EXTENSION_CONFIG_SECTION,
   GIST_CONFIG_BUNDLE,
   GIST_DESCRIPTION,
-  GIST_ROOT_RULES,
   GLOBAL_STATE_GIST_KEY,
 } from './constants';
 import {
   AntigravityPaths,
   ConfigFileMap,
-  readGlobalRules,
   scanDirectoryRecursive,
   writeSafeFile,
 } from './platform';
@@ -22,13 +20,16 @@ const AUTH_SCOPES = ['gist'];
 interface GistFileEntry {
   filename?: string;
   content: string;
+  truncated?: boolean;
+  raw_url?: string;
+  size?: number;
 }
 
 interface GistResponse {
   id: string;
   description: string;
   files: {
-    [filename: string]: GistFileEntry;
+    [filename: string]: GistFileEntry | null;
   };
 }
 
@@ -41,7 +42,7 @@ export async function getGithubSession(createIfNone: boolean = true): Promise<vs
   return session;
 }
 
-/** Finds an existing Antigravity sync Gist on the user's account without creating an empty one. */
+/** Finds an existing Antigravity sync Gist on the user account without creating an empty one. */
 export async function findExistingGistId(context: vscode.ExtensionContext, token: string): Promise<string | null> {
   // 1. Check user settings override
   const configGistId = vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION).get<string>('gistId');
@@ -75,7 +76,7 @@ export async function findExistingGistId(context: vscode.ExtensionContext, token
   return null;
 }
 
-/** Uploads local configuration files and global rules to the secret Gist. */
+/** Uploads the complete local config directory bundle to the secret Gist as a single file. */
 export async function uploadConfig(
   context: vscode.ExtensionContext,
   paths: AntigravityPaths,
@@ -83,17 +84,16 @@ export async function uploadConfig(
   const session = await getGithubSession(true);
   let gistId = await findExistingGistId(context, session.accessToken);
 
-  const localRules = readGlobalRules(paths.rulesFile);
   const localConfigBundle = scanDirectoryRecursive(paths.configDir);
   const configCount = Object.keys(localConfigBundle).length;
 
-  const payloadFiles: { [filename: string]: { content: string } } = {
-    [GIST_ROOT_RULES]: {
-      content: localRules !== null && localRules.trim() !== '' ? localRules : '# Rules\n',
-    },
+  // Single file bundle containing all configs, rules, and skills
+  const payloadFiles: { [filename: string]: { content: string } | null } = {
     [GIST_CONFIG_BUNDLE]: {
       content: JSON.stringify(localConfigBundle, null, 2),
     },
+    // Explicitly delete legacy standalone GEMINI.md from Gist if present
+    'GEMINI.md': null,
   };
 
   const headers = {
@@ -119,14 +119,18 @@ export async function uploadConfig(
       throw new Error(`Cloud update failed (status ${res.status}): ${errText}`);
     }
   } else {
-    // Create new Gist using REAL local content
+    // Create new Gist with single bundle file
     const res = await fetch(GITHUB_API_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         description: GIST_DESCRIPTION,
         public: false,
-        files: payloadFiles,
+        files: {
+          [GIST_CONFIG_BUNDLE]: {
+            content: JSON.stringify(localConfigBundle, null, 2),
+          },
+        },
       }),
     });
 
@@ -141,12 +145,12 @@ export async function uploadConfig(
   }
 
   return {
-    filesUploaded: configCount + (localRules !== null ? 1 : 0),
+    filesUploaded: configCount,
     gistId,
   };
 }
 
-/** Downloads remote configuration and global rules from the secret Gist to the local machine safely. */
+/** Downloads and restores the config directory bundle from the secret Gist to the local machine. */
 export async function downloadConfig(
   context: vscode.ExtensionContext,
   paths: AntigravityPaths,
@@ -174,18 +178,20 @@ export async function downloadConfig(
   const gist = (await res.json()) as GistResponse;
   let restoredCount = 0;
 
-  // Restore GEMINI.md global rules safely (only if remote content is non-empty)
-  if (gist.files && gist.files[GIST_ROOT_RULES] && gist.files[GIST_ROOT_RULES].content.trim() !== '') {
-    writeSafeFile(paths.rulesFile, gist.files[GIST_ROOT_RULES].content);
-    restoredCount += 1;
-  }
-
-  // Restore bundled configs under ~/.gemini/config
-  if (gist.files && gist.files[GIST_CONFIG_BUNDLE] && gist.files[GIST_CONFIG_BUNDLE].content) {
+  const bundleEntry = gist.files ? gist.files[GIST_CONFIG_BUNDLE] : null;
+  if (bundleEntry) {
     try {
-      const bundle = JSON.parse(gist.files[GIST_CONFIG_BUNDLE].content) as ConfigFileMap;
-      const keys = Object.keys(bundle);
-      if (keys.length > 0) {
+      let rawContent = bundleEntry.content;
+      // If GitHub truncated the bundle (e.g., file > 1MB), fetch from raw_url
+      if (bundleEntry.truncated && bundleEntry.raw_url) {
+        const rawRes = await fetch(bundleEntry.raw_url, { headers });
+        if (rawRes.ok) {
+          rawContent = await rawRes.text();
+        }
+      }
+
+      if (rawContent && rawContent.trim() !== '') {
+        const bundle = JSON.parse(rawContent) as ConfigFileMap;
         for (const [relativePath, content] of Object.entries(bundle)) {
           const destPath = path.join(paths.configDir, relativePath);
           writeSafeFile(destPath, content);
