@@ -27,11 +27,26 @@ export function resolveAntigravityPaths(): AntigravityPaths {
     ? path.resolve(customPath)
     : path.join(homeDir, '.gemini');
 
+  const configDir = path.join(geminiDir, 'config');
+
+  // Locate rules file inside config directory:
+  // 1. config/rules/GEMINI.md (standard)
+  // 2. config/GEMINI.md
+  // 3. Fallback to ~/.gemini/GEMINI.md if legacy
+  let rulesFile = path.join(configDir, 'rules', 'GEMINI.md');
+  if (fs.existsSync(rulesFile)) {
+    // Found in config/rules/GEMINI.md
+  } else if (fs.existsSync(path.join(configDir, 'GEMINI.md'))) {
+    rulesFile = path.join(configDir, 'GEMINI.md');
+  } else if (fs.existsSync(path.join(geminiDir, 'GEMINI.md'))) {
+    rulesFile = path.join(geminiDir, 'GEMINI.md');
+  }
+
   return {
     platform: process.platform,
     geminiDir: geminiDir,
-    configDir: path.join(geminiDir, 'config'),
-    rulesFile: path.join(geminiDir, 'GEMINI.md'),
+    configDir: configDir,
+    rulesFile: rulesFile,
   };
 }
 

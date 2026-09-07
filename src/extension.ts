@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { EXTENSION_CONFIG_SECTION, SYNC_DEBOUNCE_MS } from './constants';
 import { downloadConfig, uploadConfig } from './gist_sync';
-import { resolveAntigravityPaths } from './platform';
+import { resolveAntigravityPaths, writeSafeFile } from './platform';
 import { createSyncStatusBar, showQuickPickMenu } from './status_bar';
 
 let saveDebounceTimer: NodeJS.Timeout | null = null;
@@ -55,7 +55,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Command: Open Global Rules
   const openRulesDisposable = vscode.commands.registerCommand('antigravitySync.openRules', async () => {
     if (!fs.existsSync(paths.rulesFile)) {
-      fs.writeFileSync(paths.rulesFile, '# Coding\n1. Keep code minimal\n', 'utf8');
+      writeSafeFile(paths.rulesFile, '# Coding\n1. Keep code minimal\n');
     }
     const doc = await vscode.workspace.openTextDocument(paths.rulesFile);
     await vscode.window.showTextDocument(doc);
