@@ -1,14 +1,22 @@
 {
   "name": "antigravity-extension-sync",
   "displayName": "Antigravity Extension Sync",
-  "description": "Cross-platform synchronization for agent configuration files and rules.",
-  "version": "0.1.10",
+  "description": "Cross-platform cloud synchronization for Google Antigravity rules, configurations, and custom skills.",
+  "version": "0.1.11",
   "publisher": "TranQuangTuan",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/jzoker/antigravity-extension-sync.git"
   },
+  "keywords": [
+    "antigravity",
+    "sync",
+    "rules",
+    "skills",
+    "gemini",
+    "backup"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
